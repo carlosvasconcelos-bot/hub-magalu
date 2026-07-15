@@ -151,7 +151,7 @@ LINKS_MAGALU = [
         "titulo": "Torre de Transporte",
         "desc": "Monitoramento da frota e rotas de entrega",
         "icone": "🚚",
-        "url": "https://script.google.com/a/macros/magazineluiza.com.br/s/AKfycbwVAsTxzju7tXrBdggaiXENnix37-whUSeNuMEHNhs/exec"
+        "url": "https://script.google.com/macros/s/AKfycbydnRumhAEXucgJ3fLCrT2GbmaF4llJgR_L5rJoxPUY5Xq5ybwvy65vtL1wxIboD3_a/exec"
     }
 ]
 
@@ -180,7 +180,7 @@ def desenhar_cartao(item: dict):
 # ==========================================
 # 5. CONSTRUÇÃO DA TELA (Front-End)
 # ==========================================
-def construir_hub():
+def construir_():
     aplicar_css_magalu_premium()
 
     # Saudação dinâmica com base na hora do seu computador
@@ -196,7 +196,7 @@ def construir_hub():
     banner_html = f"""
     <div class="magalu-banner">
         <h1>{saudacao}, Equipe! 👋</h1>
-        <p>Bem-vindo ao Hub Central de Operações Magalu. O que vamos acessar agora?</p>
+        <p>Bem-vindo ao  Central de Operações Magalog CD050. O que vamos acessar agora?</p>
     </div>
     """
     st.markdown(banner_html, unsafe_allow_html=True)
