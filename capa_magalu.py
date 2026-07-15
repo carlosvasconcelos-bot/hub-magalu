@@ -180,7 +180,7 @@ def desenhar_cartao(item: dict):
 # ==========================================
 # 5. CONSTRUÇÃO DA TELA (Front-End)
 # ==========================================
-def construir_():
+def construir_hub():
     aplicar_css_magalu_premium()
 
     # Saudação dinâmica com base na hora do seu computador
@@ -196,7 +196,7 @@ def construir_():
     banner_html = f"""
     <div class="magalu-banner">
         <h1>{saudacao}, Equipe! 👋</h1>
-        <p>Bem-vindo ao  Central de Operações Magalog CD050. O que vamos acessar agora?</p>
+        <p>Bem-vindo ao Hub Central de Operações Magalog CD050. O que vamos acessar agora?</p>
     </div>
     """
     st.markdown(banner_html, unsafe_allow_html=True)
