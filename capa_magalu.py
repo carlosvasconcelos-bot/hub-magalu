@@ -1,10 +1,12 @@
 import streamlit as st
 import datetime
+import pandas as pd
+import re
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (Padrão Ouro)
 # ==========================================
-# Definimos o título, ícone e dizemos para o layout usar o modo "wide" 
+# Definimos o título, ícone e dizemos para o layout usar o modo "wide"
 # (tela mais larga) para os cartões respirarem melhor na tela.
 st.set_page_config(
     page_title="Hub Operacional | Magalu",
@@ -17,7 +19,7 @@ st.set_page_config(
 # ==========================================
 def aplicar_css_magalu_premium():
     """
-    Injeta um CSS de alto nível. Escondemos elementos padrão do Streamlit 
+    Injeta um CSS de alto nível. Escondemos elementos padrão do Streamlit
     e criamos classes personalizadas para cartões flutuantes, sombras e degradês.
     """
     estilo = """
@@ -26,7 +28,7 @@ def aplicar_css_magalu_premium():
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    
+
     /* Fundo levemente acinzentado para destacar os cartões brancos */
     .stApp {
         background-color: #F4F6F9;
@@ -125,9 +127,10 @@ def aplicar_css_magalu_premium():
     st.markdown(estilo, unsafe_allow_html=True)
 
 # ==========================================
-# 3. BASE DE DADOS DOS LINKS (Endpoints)
+# 3. BASE DE DADOS DOS LINKS (Endpoints & Fallback)
 # ==========================================
-# Aqui unimos o link à sua descrição e ao ícone que vai aparecer na tela.
+DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1vcGVtgxeNOIPKYKTCa5Y47UQE-SLvfcAI0S1uQBXXAs/edit?gid=454063207#gid=454063207"
+
 LINKS_MAGALU = [
     {
         "titulo": "Indicadores Oficiais",
@@ -154,6 +157,70 @@ LINKS_MAGALU = [
         "url": "https://script.google.com/macros/s/AKfycbydnRumhAEXucgJ3fLCrT2GbmaF4llJgR_L5rJoxPUY5Xq5ybwvy65vtL1wxIboD3_a/exec"
     }
 ]
+
+def extract_sheet_csv_url(url: str) -> str:
+    """
+    Extrai a URL de exportação CSV a partir de um link de planilha do Google Sheets.
+    """
+    sheet_id_match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
+    gid_match = re.search(r'[?&]gid=([0-9]+)', url)
+
+    if sheet_id_match:
+        sheet_id = sheet_id_match.group(1)
+        gid = gid_match.group(1) if gid_match else '0'
+        return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    return url
+
+@st.cache_data(ttl=60)
+def carregar_links_google_sheets(sheet_url: str):
+    """
+    Carrega os links a partir do Google Sheets.
+    Retorna uma tupla (links, erro_msg). Se houver erro, utiliza os links de fallback.
+    """
+    try:
+        csv_url = extract_sheet_csv_url(sheet_url)
+        df = pd.read_csv(csv_url)
+
+        # Mapeamento de colunas insensível a maiúsculas/minúsculas
+        col_map = {}
+        for col in df.columns:
+            clean_col = str(col).strip().lower()
+            if clean_col in ['titulo', 'title', 'nome']:
+                col_map[col] = 'titulo'
+            elif clean_col in ['desc', 'descricao', 'descrição', 'description']:
+                col_map[col] = 'desc'
+            elif clean_col in ['icone', 'ícone', 'icon']:
+                col_map[col] = 'icone'
+            elif clean_col in ['url', 'link', 'endpoint']:
+                col_map[col] = 'url'
+
+        df = df.rename(columns=col_map)
+
+        required = ['titulo', 'url']
+        if not all(k in df.columns for k in required):
+            return LINKS_MAGALU, "Colunas obrigatórias ('titulo', 'url') não encontradas na planilha."
+
+        if 'desc' not in df.columns:
+            df['desc'] = ''
+        if 'icone' not in df.columns:
+            df['icone'] = '🔗'
+
+        links = []
+        for _, row in df.iterrows():
+            if pd.notna(row['titulo']) and pd.notna(row['url']):
+                links.append({
+                    "titulo": str(row['titulo']).strip(),
+                    "desc": str(row['desc']).strip() if pd.notna(row['desc']) else "",
+                    "icone": str(row['icone']).strip() if pd.notna(row['icone']) else "🔗",
+                    "url": str(row['url']).strip()
+                })
+
+        if not links:
+            return LINKS_MAGALU, "Nenhum link válido encontrado na planilha."
+
+        return links, None
+    except Exception as e:
+        return LINKS_MAGALU, f"Não foi possível carregar a planilha diretamente ({str(e)}). Exibindo dados padrão."
 
 # ==========================================
 # 4. FUNÇÃO DE RENDERIZAÇÃO DE CARTÕES
@@ -183,6 +250,16 @@ def desenhar_cartao(item: dict):
 def construir_hub():
     aplicar_css_magalu_premium()
 
+    # Painel Lateral para Fonte de Dados
+    with st.sidebar:
+        st.header("⚙️ Configurações")
+        sheet_input = st.text_input("URL do Google Sheets", value=DEFAULT_SHEET_URL)
+        if st.button("Atualizar Dados"):
+            st.cache_data.clear()
+
+    # Carrega os links do Google Sheets ou Fallback
+    links, erro_msg = carregar_links_google_sheets(sheet_input)
+
     # Saudação dinâmica com base na hora do seu computador
     hora_atual = datetime.datetime.now().hour
     if hora_atual < 12:
@@ -201,18 +278,21 @@ def construir_hub():
     """
     st.markdown(banner_html, unsafe_allow_html=True)
 
+    if erro_msg:
+        st.info(f"ℹ️ {erro_msg}")
+
     # st.container cria um bloco centralizado para os botões não ficarem esticados demais
     with st.container():
         # Criação de 2 colunas para alinhar os cartões lado a lado
         col1, col2 = st.columns(2)
-        
-        with col1:
-            desenhar_cartao(LINKS_MAGALU[0])
-            desenhar_cartao(LINKS_MAGALU[2])
-            
-        with col2:
-            desenhar_cartao(LINKS_MAGALU[1])
-            desenhar_cartao(LINKS_MAGALU[3])
+
+        for idx, item in enumerate(links):
+            if idx % 2 == 0:
+                with col1:
+                    desenhar_cartao(item)
+            else:
+                with col2:
+                    desenhar_cartao(item)
 
     # Rodapé discreto estilo sistema interno
     st.markdown("<br><hr style='border:1px solid #E5E5E5;'>", unsafe_allow_html=True)
